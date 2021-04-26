@@ -2067,7 +2067,7 @@ int decode_icmp_ipv4(
 
     icp = (struct icmp*)(reply_buf + hlen);
 
-    if (icp->icmp_type != ICMP_ECHOREPLY) {
+    if (icp->icmp_type != ICMP_ER) {
         /* Handle other ICMP packets */
         struct icmp* sent_icmp;
         SEQMAP_VALUE* seqmap_value;
@@ -2095,7 +2095,7 @@ int decode_icmp_ipv4(
         getnameinfo(response_addr, response_addr_len, addr_ascii, INET6_ADDRSTRLEN, NULL, 0, NI_NUMERICHOST);
 
         switch (icp->icmp_type) {
-        case ICMP_UNREACH:
+        case ICMP_DUR:
             h = table[seqmap_value->host_nr];
             if (icp->icmp_code > ICMP_UNREACH_MAXTYPE) {
                 print_warning("ICMP Unreachable (Invalid Code) from %s for ICMP Echo sent to %s",
@@ -2110,10 +2110,10 @@ int decode_icmp_ipv4(
             num_othericmprcvd++;
             break;
 
-        case ICMP_SOURCEQUENCH:
-        case ICMP_REDIRECT:
-        case ICMP_TIMXCEED:
-        case ICMP_PARAMPROB:
+        case ICMP_SQ:
+        case ICMP_RD:
+        case ICMP_TE:
+        case ICMP_PP:
             h = table[seqmap_value->host_nr];
             if (icp->icmp_type <= ICMP_TYPE_STR_MAX) {
                 print_warning("%s from %s for ICMP Echo sent to %s",
@@ -2187,7 +2187,7 @@ int decode_icmp_ipv6(
         getnameinfo(response_addr, response_addr_len, addr_ascii, INET6_ADDRSTRLEN, NULL, 0, NI_NUMERICHOST);
 
         switch (icp->icmp6_type) {
-        case ICMP_UNREACH:
+        case ICMP_DUR:
             h = table[seqmap_value->host_nr];
             if (icp->icmp6_code > ICMP_UNREACH_MAXTYPE) {
                 print_warning("ICMP Unreachable (Invalid Code) from %s for ICMP Echo sent to %s",
@@ -2202,10 +2202,10 @@ int decode_icmp_ipv6(
             num_othericmprcvd++;
             break;
 
-        case ICMP_SOURCEQUENCH:
-        case ICMP_REDIRECT:
-        case ICMP_TIMXCEED:
-        case ICMP_PARAMPROB:
+        case ICMP_SQ:
+        case ICMP_RD:
+        case ICMP_TE:
+        case ICMP_PP:
             h = table[seqmap_value->host_nr];
             if (icp->icmp6_type <= ICMP_TYPE_STR_MAX) {
                 print_warning("%s from %s for ICMP Echo sent to %s",
