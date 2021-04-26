@@ -2037,7 +2037,7 @@ int decode_icmp_ipv4(
     unsigned short* id,
     unsigned short* seq)
 {
-    struct icmp* icp;
+    struct icmp_echo_hdr* icp;
     int hlen = 0;
 
     if (!using_sock_dgram4) {
@@ -2065,11 +2065,11 @@ int decode_icmp_ipv4(
         return -1;
     }
 
-    icp = (struct icmp*)(reply_buf + hlen);
+    icp = (struct icmp_echo_hdr*)(reply_buf + hlen);
 
-    if (icp->icmp_type != ICMP_ER) {
+    if (icp->type != ICMP_ER) {
         /* Handle other ICMP packets */
-        struct icmp* sent_icmp;
+        struct icmp_echo_hdr* sent_icmp;
         SEQMAP_VALUE* seqmap_value;
         char addr_ascii[INET6_ADDRSTRLEN];
         HOST_ENTRY* h;
@@ -2080,9 +2080,9 @@ int decode_icmp_ipv4(
             return -1;
         }
 
-        sent_icmp = (struct icmp*)(reply_buf + hlen + ICMP_MINLEN + sizeof(struct ip));
+        sent_icmp = (struct icmp_echo_hdr*)(reply_buf + hlen + ICMP_MINLEN + sizeof(struct ip));
 
-        if (sent_icmp->icmp_type != ICMP_ECHO || sent_icmp->icmp_id != ident4) {
+        if (sent_icmp->type != ICMP_ECHO || sent_icmp->id != ident4) {
             /* not caused by us */
             return -1;
         }
@@ -2094,16 +2094,16 @@ int decode_icmp_ipv4(
 
         getnameinfo(response_addr, response_addr_len, addr_ascii, INET6_ADDRSTRLEN, NULL, 0, NI_NUMERICHOST);
 
-        switch (icp->icmp_type) {
+        switch (icp->type) {
         case ICMP_DUR:
             h = table[seqmap_value->host_nr];
-            if (icp->icmp_code > ICMP_UNREACH_MAXTYPE) {
+            if (icp->code > ICMP_UNREACH_MAXTYPE) {
                 print_warning("ICMP Unreachable (Invalid Code) from %s for ICMP Echo sent to %s",
                     addr_ascii, h->host);
             }
             else {
                 print_warning("%s from %s for ICMP Echo sent to %s",
-                    icmp_unreach_str[icp->icmp_code], addr_ascii, h->host);
+                    icmp_unreach_str[icp->code], addr_ascii, h->host);
             }
 
             print_warning("\n");
@@ -2115,13 +2115,13 @@ int decode_icmp_ipv4(
         case ICMP_TE:
         case ICMP_PP:
             h = table[seqmap_value->host_nr];
-            if (icp->icmp_type <= ICMP_TYPE_STR_MAX) {
+            if (icp->type <= ICMP_TYPE_STR_MAX) {
                 print_warning("%s from %s for ICMP Echo sent to %s",
-                    icmp_type_str[icp->icmp_type], addr_ascii, h->host);
+                    icmp_type_str[icp->type], addr_ascii, h->host);
             }
             else {
                 print_warning("ICMP %d from %s for ICMP Echo sent to %s",
-                    icp->icmp_type, addr_ascii, h->host);
+                    icp->type, addr_ascii, h->host);
             }
             print_warning("\n");
             num_othericmprcvd++;
@@ -2131,8 +2131,8 @@ int decode_icmp_ipv4(
         return -1;
     }
 
-    *id = icp->icmp_id;
-    *seq = ntohs(icp->icmp_seq);
+    *id = icp->id;
+    *seq = ntohs(icp->seqno);
 
     return hlen;
 }
