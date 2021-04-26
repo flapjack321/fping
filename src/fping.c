@@ -2202,7 +2202,7 @@ int decode_icmp_ipv6(
 
     icp = (struct icmp6_hdr*)reply_buf;
 
-    if (icp->icmp6_type != ICMP6_ECHO_REPLY) {
+    if (icp->icmp6_type != ICMP6_TYPE_EREP) {
         /* Handle other ICMP packets */
         struct icmp6_hdr* sent_icmp;
         SEQMAP_VALUE* seqmap_value;
