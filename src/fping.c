@@ -71,12 +71,12 @@ extern "C" {
 #endif /* HAVE_SYS_FILE_H */
 
 #ifdef IPV6
-#include <netinet/icmp6.h>
+#include <lwip/prot/icmp6.h>
 #endif
 #include <netinet/in_systm.h>
 
-#include <netinet/ip.h>
-#include <netinet/ip_icmp.h>
+#include <lwip/ip.h>
+#include <lwip/prot/icmp.h>
 
 #include <arpa/inet.h>
 #include <ctype.h>
