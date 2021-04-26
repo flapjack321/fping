@@ -131,24 +131,24 @@ unsigned short calcsum(unsigned short* buffer, int length)
 
 int socket_sendto_ping_ipv4(int s, struct sockaddr* saddr, socklen_t saddr_len, uint16_t icmp_seq_nr, uint16_t icmp_id_nr)
 {
-    struct icmp* icp;
+    struct icmp_echo_hdr* icp;
     int n;
 
-    icp = (struct icmp*)ping_buffer_ipv4;
+    icp = (struct icmp_echo_hdr*)ping_buffer_ipv4;
 
-    icp->icmp_type = ICMP_ECHO;
-    icp->icmp_code = 0;
-    icp->icmp_cksum = 0;
-    icp->icmp_seq = htons(icmp_seq_nr);
-    icp->icmp_id = icmp_id_nr;
+    icp->type = ICMP_ECHO;
+    icp->code = 0;
+    icp->chksum = 0;
+    icp->seqno = htons(icmp_seq_nr);
+    icp->id = icmp_id_nr;
 
-    if (random_data_flag) {
-        for (n = ((char*)&icp->icmp_data - (char*)icp); n < ping_pkt_size_ipv4; ++n) {
-            ping_buffer_ipv4[n] = random() & 0xFF;
-        }
-    }
+//    if (random_data_flag) {
+//        for (n = ((char*)&icp->icmp_data - (char*)icp); n < ping_pkt_size_ipv4; ++n) {
+//            ping_buffer_ipv4[n] = random() & 0xFF;
+//        }
+//    }
 
-    icp->icmp_cksum = calcsum((unsigned short*)icp, ping_pkt_size_ipv4);
+    icp->chksum = calcsum((unsigned short*)icp, ping_pkt_size_ipv4);
 
     n = sendto(s, icp, ping_pkt_size_ipv4, 0, saddr, saddr_len);
 
