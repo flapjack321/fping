@@ -2130,7 +2130,7 @@ int decode_icmp_ipv4(
             return -1;
         }
 
-        seqmap_value = seqmap_fetch(ntohs(sent_icmp->icmp_seq), current_time_ns);
+        seqmap_value = seqmap_fetch(ntohs(sent_icmp->seqno), current_time_ns);
         if (seqmap_value == NULL) {
             return -1;
         }
