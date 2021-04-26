@@ -41,7 +41,7 @@
 #include <string.h>
 #include <sys/socket.h>
 
-#include <netinet/icmp6.h>
+#include <lwip/prot/icmp6.h>
 
 char* ping_buffer_ipv6 = 0;
 size_t ping_pkt_size_ipv6;
