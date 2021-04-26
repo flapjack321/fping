@@ -2041,16 +2041,16 @@ int decode_icmp_ipv4(
     int hlen = 0;
 
     if (!using_sock_dgram4) {
-        struct ip* ip = (struct ip*)reply_buf;
+        struct ip_hdr* ip = (struct ip_hdr*)reply_buf;
 
 #if defined(__alpha__) && __STDC__ && !defined(__GLIBC__)
         /* The alpha headers are decidedly broken.
          * Using an ANSI compiler, it provides ip_vhl instead of ip_hl and
          * ip_v.  So, to get ip_hl, we mask off the bottom four bits.
          */
-        hlen = (ip->ip_vhl & 0x0F) << 2;
+        hlen = (ip->_v_hl & 0x0F) << 2;
 #else
-        hlen = ip->ip_hl << 2;
+        hlen = ip->_v_hl << 2;
 #endif
     }
 
@@ -2075,12 +2075,12 @@ int decode_icmp_ipv4(
         HOST_ENTRY* h;
 
         /* reply icmp packet (hlen + ICMP_MINLEN) followed by "sent packet" (ip + icmp headers) */
-        if (reply_buf_len < hlen + ICMP_MINLEN + sizeof(struct ip) + ICMP_MINLEN) {
+        if (reply_buf_len < hlen + ICMP_MINLEN + sizeof(struct ip_hdr) + ICMP_MINLEN) {
             /* discard ICMP message if we can't tell that it was caused by us (i.e. if the "sent packet" is not included). */
             return -1;
         }
 
-        sent_icmp = (struct icmp_echo_hdr*)(reply_buf + hlen + ICMP_MINLEN + sizeof(struct ip));
+        sent_icmp = (struct icmp_echo_hdr*)(reply_buf + hlen + ICMP_MINLEN + sizeof(struct ip_hdr));
 
         if (sent_icmp->type != ICMP_ECHO || sent_icmp->id != ident4) {
             /* not caused by us */
@@ -2167,12 +2167,12 @@ int decode_icmp_ipv6(
         HOST_ENTRY* h;
 
         /* reply icmp packet (ICMP_MINLEN) followed by "sent packet" (ip + icmp headers) */
-        if (reply_buf_len < ICMP_MINLEN + sizeof(struct ip) + ICMP_MINLEN) {
+        if (reply_buf_len < ICMP_MINLEN + sizeof(struct ip_hdr) + ICMP_MINLEN) {
             /* discard ICMP message if we can't tell that it was caused by us (i.e. if the "sent packet" is not included). */
             return 0;
         }
 
-        sent_icmp = (struct icmp6_hdr*)(reply_buf + sizeof(struct icmp6_hdr) + sizeof(struct ip));
+        sent_icmp = (struct icmp6_hdr*)(reply_buf + sizeof(struct icmp6_hdr) + sizeof(struct ip_hdr));
 
         if (sent_icmp->icmp6_type != ICMP_ECHO || sent_icmp->icmp6_id != ident6) {
             /* not caused by us */
