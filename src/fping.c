@@ -2053,7 +2053,7 @@ int decode_icmp_ipv4(
          */
         hlen = (ip->_v_hl & 0x0F) << 2;
 #else
-        hlen = ip->_v_hl << 2;
+        hlen = (ip->_v_hl & 0x0F) << 2;
 #endif
     }
 
