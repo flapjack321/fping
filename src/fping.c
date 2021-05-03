@@ -1977,7 +1977,10 @@ int receive_packet(int64_t wait_time,
         return 0; /* timeout */
     }
 
-    recv_len = recvmsg(s, &recv_msghdr, MSG_TRUNC);
+// MSG_TRUNC(0x04) == MSG_OOB(0x04)
+// MSG_OOB is an unsupported option and so fails the assertion check
+//    recv_len = recvmsg(s, &recv_msghdr, MSG_TRUNC);
+    recv_len = recvmsg(s, &recv_msghdr, 0);
     if (recv_len <= 0) {
         return 0;
     }
