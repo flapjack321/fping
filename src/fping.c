@@ -84,6 +84,9 @@ extern "C" {
 
 #include <sys/select.h>
 
+/*** ukstore configuration ***/
+#include <uk/store.h>
+
 /*** compatibility ***/
 
 /* Mac OS X's getaddrinfo() does not fail if we use an invalid combination,
@@ -445,8 +448,37 @@ int p_setsockopt(uid_t p_uid, int sockfd, int level, int optname,
 
 ************************************************************/
 
+int latency_getter(__s64 *dst) {
+    HOST_ENTRY *h;
+
+    if (num_hosts != 1) {
+      fprintf(stderr, "unsupported number of hosts (%d)\n", num_hosts);
+      return -1;
+    }
+
+    h = table[0];
+    if (h->num_sent == 0) {
+      fprintf(stderr, "no response times to report\n");
+      return -1;
+    }
+    *dst = h->resp_times[h->num_sent - 1];
+
+    return 0;
+}
+
 int main(int argc, char** argv)
 {
+    int ukstore_ret;
+    struct uk_store_folder *fping_stats;
+    struct uk_store_entry *fping_stats_latency;
+
+    fping_stats = uk_store_dynamic_folder_create("fping_stats");
+    ukstore_ret = uk_store_add_folder(fping_stats);
+    fprintf(stderr, "DEBUG: ukstore registered fping_stats(...)=%d\n", ukstore_ret);
+
+    fping_stats_latency = uk_store_dynamic_entry_create(fping_stats, "latency", s64, latency_getter, NULL);
+    fprintf(stderr, "DEBUG: ukstore registered entry to `fping_stats' named `latency'\n");
+
     int c;
     const uid_t suid = geteuid();
     int tos = 0;
@@ -1160,6 +1192,15 @@ int main(int argc, char** argv)
     /* main loop */
     main_loop();
 
+    // int64_t storage;
+    // int ukret;
+    // fprintf(stderr, "DEBUG: attempting to use uk_store_get_value...\n");
+    // ukret = uk_store_get_value(fping_stats_latency, s64, &storage);
+    // if (ukret == 0)
+    //   fprintf(stderr, "DEBUG: used ukstore to get last latency entry => %"PRId64"\n", storage);
+    // else
+    //   fprintf(stderr, "DEBUG: ukstore returned non-zero code (%d). failed\n", ukret);
+
     finish();
 
     return 0;
@@ -1377,7 +1418,7 @@ void main_loop()
                 host_add_ping_event(h, event->ping_index+1, event->ev_time + perhost_interval);
             }
         }
-        
+
         wait_for_reply:
 
         /* When is the next ping next event? */
@@ -1407,7 +1448,7 @@ void main_loop()
                     wait_time_ns = 0;
                 }
             }
-            
+
             dbg_printf("next timeout event in %.0f ms (%s)\n", wait_time_timeout / 1e6, event_queue_timeout.first->host->host);
         }
 
@@ -2395,7 +2436,7 @@ int wait_for_reply(int64_t wait_time)
         min_reply = this_reply;
     sum_replies += this_reply;
     total_replies++;
-    
+
     /* initialize timeout to initial timeout (without backoff) */
     h->timeout = timeout;
 
@@ -2404,7 +2445,7 @@ int wait_for_reply(int64_t wait_time)
     if(timeout_event) {
         ev_remove(&event_queue_timeout, timeout_event);
     }
-    
+
     /* print "is alive" */
     if (h->num_recv == 1) {
         num_alive++;
