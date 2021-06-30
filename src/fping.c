@@ -84,8 +84,9 @@ extern "C" {
 
 #include <sys/select.h>
 
-/*** ukstore configuration ***/
-#include <uk/store.h>
+#ifdef CONFIG_FPING_UKSTORE_SUPPORT
+# include <uk/store.h>
+#endif
 
 /*** compatibility ***/
 
@@ -398,57 +399,36 @@ struct event *host_get_timeout_event(HOST_ENTRY *h, int index);
 void stats_add(HOST_ENTRY *h, int index, int success, int64_t latency);
 void update_current_time();
 
-/************************************************************
+#ifdef CONFIG_FPING_UKSTORE_SUPPORT
+/*** ukstore forward declarations ***/
+int latest_getter(__s64 *dst);
+int min_getter(__s64 *dst);
+int max_getter(__s64 *dst);
 
-  Function: p_setsockopt
-
-*************************************************************
-
-  Inputs:  p_uid: privileged uid. Others as per setsockopt(2)
-
-  Description:
-
-  Elevates privileges to p_uid when required, calls
-  setsockopt, and drops privileges back.
-
-************************************************************/
-
-int p_setsockopt(uid_t p_uid, int sockfd, int level, int optname,
-	const void *optval, socklen_t optlen)
-{
-    const uid_t saved_uid = geteuid();
-    int res;
-
-    if (p_uid != saved_uid && seteuid(p_uid)) {
-	perror("cannot elevate privileges for setsockopt");
-    }
-
-    res = setsockopt(sockfd, level, optname, optval, optlen);
-
-    if (p_uid != saved_uid && seteuid(saved_uid)) {
-	perror("fatal error: could not drop privileges after setsockopt");
-	/* continuing would be a security hole */
-	exit(4);
-    }
-
-    return res;
-}
+UK_STORE_STATIC_ENTRY(fping_latest, s64, latest_getter, NULL);
+UK_STORE_STATIC_ENTRY(fping_minimum, s64, min_getter, NULL);
+UK_STORE_STATIC_ENTRY(fping_maximum, s64, max_getter, NULL);
+#endif
 
 /************************************************************
 
-  Function: main
+  ukstore getter functions
 
 *************************************************************
 
-  Inputs:  int argc, char** argv
+  Inputs:  dst: pointer to storage destination of data
 
   Description:
 
-  Main program entry point
+  Gets a metric about the ping stats and copies it into the
+  location provided.
+
+  `latency_getter`: get the most recent latency metric for
+                    the first host in the HOST_ENTRY table
 
 ************************************************************/
 
-int latency_getter(__s64 *dst) {
+int latest_getter(__s64 *dst) {
     HOST_ENTRY *h;
 
     if (num_hosts != 1) {
@@ -466,21 +446,60 @@ int latency_getter(__s64 *dst) {
     return 0;
 }
 
+int min_getter(__s64 *dst) {
+  HOST_ENTRY *h;
+
+  if (num_hosts != 1) {
+    fprintf(stderr, "unsupported number of hosts (%d)\n", num_hosts);
+    return -1;
+  }
+
+  h = table[0];
+  if (h->num_sent == 0) {
+    fprintf(stderr, "no response times to report\n");
+    return -1;
+  }
+  *dst = h->min_reply;
+
+  return 0;
+}
+
+int max_getter(__s64 *dst) {
+  HOST_ENTRY *h;
+
+  if (num_hosts != 1) {
+    fprintf(stderr, "unsupported number of hosts (%d)\n", num_hosts);
+    return -1;
+  }
+
+  h = table[0];
+  if (h->num_sent == 0) {
+    fprintf(stderr, "no response time to report\n");
+    return -1;
+  }
+  *dst = h->max_reply;
+
+  return 0;
+}
+
+/************************************************************
+
+  Function: main
+
+*************************************************************
+
+  Inputs:  int argc, char** argv
+
+  Description:
+
+  Main program entry point
+
+************************************************************/
+
 int main(int argc, char** argv)
 {
-    int ukstore_ret;
-    struct uk_store_folder *fping_stats;
-    struct uk_store_entry *fping_stats_latency;
-
-    fping_stats = uk_store_dynamic_folder_create("fping_stats");
-    ukstore_ret = uk_store_add_folder(fping_stats);
-    fprintf(stderr, "DEBUG: ukstore registered fping_stats(...)=%d\n", ukstore_ret);
-
-    fping_stats_latency = uk_store_dynamic_entry_create(fping_stats, "latency", s64, latency_getter, NULL);
-    fprintf(stderr, "DEBUG: ukstore registered entry to `fping_stats' named `latency'\n");
-
     int c;
-    const uid_t suid = geteuid();
+    uid_t uid;
     int tos = 0;
     struct optparse optparse_state;
 #ifdef USE_SIGACTION
@@ -516,9 +535,9 @@ int main(int argc, char** argv)
     memset(&src_addr6, 0, sizeof(src_addr6));
 #endif
 
-    if (!suid && suid != getuid()) {
-        /* *temporarily* drop privileges */
-        if (seteuid(getuid()) == -1)
+    if ((uid = getuid())) {
+        /* drop privileges */
+        if (setuid(getuid()) == -1)
             perror("cannot setuid");
     }
 
@@ -808,14 +827,14 @@ int main(int argc, char** argv)
         case 'I':
 #ifdef SO_BINDTODEVICE
             if (socket4 >= 0) {
-                if (p_setsockopt(suid, socket4, SOL_SOCKET, SO_BINDTODEVICE, optparse_state.optarg, strlen(optparse_state.optarg))) {
+                if (setsockopt(socket4, SOL_SOCKET, SO_BINDTODEVICE, optparse_state.optarg, strlen(optparse_state.optarg))) {
                     perror("binding to specific interface (SO_BINTODEVICE)");
                     exit(1);
                 }
             }
 #ifdef IPV6
             if (socket6 >= 0) {
-                if (p_setsockopt(suid, socket6, SOL_SOCKET, SO_BINDTODEVICE, optparse_state.optarg, strlen(optparse_state.optarg))) {
+                if (setsockopt(socket6, SOL_SOCKET, SO_BINDTODEVICE, optparse_state.optarg, strlen(optparse_state.optarg))) {
                     perror("binding to specific interface (SO_BINTODEVICE), IPV6");
                     exit(1);
                 }
@@ -862,13 +881,6 @@ int main(int argc, char** argv)
             exit(1);
             break;
         }
-    }
-
-    /* permanetly drop privileges */
-    if (suid != getuid() && setuid(getuid())) {
-	perror("fatal: failed to permanently drop privileges");
-	/* continuing would be a security hole */
-	exit(4);
     }
 
     /* validate various option settings */
@@ -1135,11 +1147,11 @@ int main(int argc, char** argv)
         exit(num_noaddress ? 2 : 1);
     }
 
-    if (src_addr_set && socket4 >= 0) {
+    if (socket4 >= 0) {
         socket_set_src_addr_ipv4(socket4, &src_addr, (socktype4 == SOCK_DGRAM) ? &ident4 : NULL);
     }
 #ifdef IPV6
-    if (src_addr6_set && socket6 >= 0) {
+    if (socket6 >= 0) {
         socket_set_src_addr_ipv6(socket6, &src_addr6, (socktype6 == SOCK_DGRAM) ? &ident6 : NULL);
     }
 #endif
@@ -1192,14 +1204,38 @@ int main(int argc, char** argv)
     /* main loop */
     main_loop();
 
-    // int64_t storage;
-    // int ukret;
-    // fprintf(stderr, "DEBUG: attempting to use uk_store_get_value...\n");
-    // ukret = uk_store_get_value(fping_stats_latency, s64, &storage);
-    // if (ukret == 0)
-    //   fprintf(stderr, "DEBUG: used ukstore to get last latency entry => %"PRId64"\n", storage);
-    // else
-    //   fprintf(stderr, "DEBUG: ukstore returned non-zero code (%d). failed\n", ukret);
+#ifdef CONFIG_FPING_UKSTORE_SUPPORT_DEBUG
+    int64_t storage;
+    int ukret;
+    struct uk_store_entry *my_entry
+
+    fprintf(stderr, "DEBUG: attempting to use uk_store_get_entry(libfping, NULL, `fping_latest')\n");
+    my_entry= uk_store_get_entry(libfping, NULL, "fping_latest");
+    fprintf(stderr, "DEBUG: attempting to use uk_store_get_value(%p, ...)\n", my_entry);
+    ukret = uk_store_get_value(my_entry, s64, &storage);
+    if (ukret == 0)
+      fprintf(stderr, "DEBUG: used ukstore to get last latency entry => %"PRId64"\n", storage);
+    else
+      fprintf(stderr, "DEBUG: ukstore returned non-zero code (%d). failed\n", ukret);
+
+    fprintf(stderr, "DEBUG: attempting to use uk_store_get_entry(libfping, NULL, `fping_minimum')\n");
+    my_entry= uk_store_get_entry(libfping, NULL, "fping_minimum");
+    fprintf(stderr, "DEBUG: attempting to use uk_store_get_value(%p, ...)\n", my_entry);
+    ukret = uk_store_get_value(my_entry, s64, &storage);
+    if (ukret == 0)
+      fprintf(stderr, "DEBUG: used ukstore to get minimum entry => %"PRId64"\n", storage);
+    else
+      fprintf(stderr, "DEBUG: ukstore returned non-zero code (%d). failed\n", ukret);
+
+    fprintf(stderr, "DEBUG: attempting to use uk_store_get_entry(libfping, NULL, `fping_maximum')\n");
+    my_entry= uk_store_get_entry(libfping, NULL, "fping_maximum");
+    fprintf(stderr, "DEBUG: attempting to use uk_store_get_value(%p, ...)\n", my_entry);
+    ukret = uk_store_get_value(my_entry, s64, &storage);
+    if (ukret == 0)
+      fprintf(stderr, "DEBUG: used ukstore to get maximum entry => %"PRId64"\n", storage);
+    else
+      fprintf(stderr, "DEBUG: ukstore returned non-zero code (%d). failed\n", ukret);
+#endif
 
     finish();
 
