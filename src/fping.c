@@ -400,6 +400,7 @@ void stats_add(HOST_ENTRY *h, int index, int success, int64_t latency);
 void update_current_time();
 
 #ifdef CONFIG_FPING_UKSTORE_SUPPORT
+int64_t latest_ping;
 int latest_getter(__s64 *dst);
 int min_getter(__s64 *dst);
 int max_getter(__s64 *dst);
@@ -445,7 +446,11 @@ int latest_getter(__s64 *dst) {
     fprintf(stderr, "no response times to report\n");
     return -1;
   }
-  *dst = h->resp_times[h->num_sent - 1];
+
+  if (loop_flag) 
+    *dst = latest_ping;
+  else
+    *dst = h->resp_times[h->num_sent - 1];
 
   return 0;
 }
@@ -2141,6 +2146,8 @@ void stats_add(HOST_ENTRY *h, int index, int success, int64_t latency)
     /* response time per-packet (count mode) */
     if(!loop_flag && index>=0) {
         h->resp_times[index] = latency;
+    } else if (loop_flag) {
+        latest_ping = latency;
     }
 }
 
