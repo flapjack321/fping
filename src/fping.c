@@ -408,7 +408,6 @@ int max_getter(__s64 *dst);
 UK_STORE_STATIC_ENTRY(fping_latest, s64, latest_getter, NULL);
 UK_STORE_STATIC_ENTRY(fping_minimum, s64, min_getter, NULL);
 UK_STORE_STATIC_ENTRY(fping_maximum, s64, max_getter, NULL);
-#endif
 
 /************************************************************
 
@@ -490,6 +489,7 @@ int max_getter(__s64 *dst) {
 
   return 0;
 }
+#endif
 
 /************************************************************
 
@@ -2146,9 +2146,12 @@ void stats_add(HOST_ENTRY *h, int index, int success, int64_t latency)
     /* response time per-packet (count mode) */
     if(!loop_flag && index>=0) {
         h->resp_times[index] = latency;
-    } else if (loop_flag) {
+    }
+#ifdef CONFIG_FPING_UKSTORE_SUPPORT
+    else if (loop_flag) {
         latest_ping = latency;
     }
+#endif
 }
 
 /* stats_reset_interval: reset interval statistics
